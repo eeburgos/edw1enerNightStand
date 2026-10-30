@@ -1,0 +1,2152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- iOS Web App Meta Tags for Full-Screen Home Screen Mode on iPad 4 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StandBy Frame">
+    <meta name="format-detection" content="telephone=no">
+    
+    <title>StandBy Frame — iPad Nightstand Dashboard</title>
+
+    <!-- Tailwind CSS for utility styling + Custom iOS 10 WebKit CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        /* ==========================================================================
+           iOS 10.3.3 / iPad 4 WebKit Specific Optimizations & Apple Design System
+           ========================================================================== */
+        * {
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        input, textarea, select {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Apple Frosted Glass (Materials) with iOS 10 -webkit-backdrop-filter + RGBA fallback */
+        .apple-glass {
+            background-color: rgba(24, 24, 28, 0.58);
+            -webkit-backdrop-filter: saturate(180%) blur(28px);
+            backdrop-filter: saturate(180%) blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            -webkit-transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .apple-glass-pill {
+            background-color: rgba(32, 32, 36, 0.65);
+            -webkit-backdrop-filter: saturate(180%) blur(22px);
+            backdrop-filter: saturate(180%) blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .apple-modal-glass {
+            background-color: rgba(28, 28, 32, 0.88);
+            -webkit-backdrop-filter: saturate(190%) blur(35px);
+            backdrop-filter: saturate(190%) blur(35px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.75);
+        }
+
+        /* Photo Slideshow Layers */
+        .slide-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            -webkit-transition: opacity 1.6s ease-in-out;
+            transition: opacity 1.6s ease-in-out;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .slide-layer.active {
+            opacity: 1;
+            z-index: 2;
+        }
+
+        /* Blurred Ambient Backdrop for Portrait Photos on Landscape 4:3 iPad */
+        .slide-backdrop {
+            position: absolute;
+            top: -8%;
+            left: -8%;
+            width: 116%;
+            height: 116%;
+            background-size: cover;
+            background-position: center center;
+            -webkit-filter: blur(42px) brightness(0.55) saturate(140%);
+            filter: blur(42px) brightness(0.55) saturate(140%);
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            display: none;
+        }
+
+        .use-portrait-blur .slide-backdrop {
+            display: block;
+        }
+
+        /* Main Foreground Photo */
+        .slide-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            -webkit-transform: scale(1) translateZ(0);
+            transform: scale(1) translateZ(0);
+            -webkit-transition: -webkit-transform 24s ease-out;
+            transition: transform 24s ease-out;
+        }
+
+        /* When portrait image is detected & smart blur is enabled, fit inside nicely */
+        .use-portrait-blur .slide-image.is-portrait {
+            background-size: contain;
+        }
+
+        /* Ken Burns Slow Pan & Zoom Effect */
+        .use-ken-burns .slide-layer.active .slide-image {
+            -webkit-transform: scale(1.09) translate3d(-1.2%, -0.8%, 0);
+            transform: scale(1.09) translate3d(-1.2%, -0.8%, 0);
+        }
+
+        /* Subtle Bottom & Corner Vignette for Unmatched Text Legibility */
+        .ambient-vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+            background: radial-gradient(circle at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%),
+                        linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.15) 28%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%);
+            -webkit-transition: opacity 0.8s ease;
+            transition: opacity 0.8s ease;
+        }
+
+        /* ==========================================================================
+           LAYOUT MODES: Full-Screen Bleed vs. StandBy Split-Screen
+           ========================================================================== */
+        #app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Mode 1: Full-Screen Photo Bleed (Default) */
+        .layout-fullscreen #photo-stage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .layout-fullscreen #widgets-stage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-justify-content: space-between;
+            justify-content: space-between;
+            -webkit-align-items: flex-end;
+            align-items: flex-end;
+            padding: 36px;
+        }
+
+        /* Mode 2: StandBy Split-Screen (Photo Left 60%, Widgets Right 40%) */
+        .layout-split {
+            display: -webkit-flex;
+            display: flex;
+            -webkit-flex-direction: row;
+            flex-direction: row;
+            padding: 28px;
+            background-color: #000000;
+        }
+
+        .layout-split #photo-stage {
+            position: relative;
+            width: 60%;
+            height: 100%;
+            border-radius: 32px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .layout-split #widgets-stage {
+            position: relative;
+            width: 40%;
+            height: 100%;
+            padding-left: 26px;
+            z-index: 10;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-flex-direction: column;
+            flex-direction: column;
+            -webkit-justify-content: space-between;
+            justify-content: space-between;
+        }
+
+        .layout-split .widget-card {
+            width: 100% !important;
+            max-width: none !important;
+        }
+
+        .layout-split #clock-weather-card {
+            margin-bottom: 20px;
+            -webkit-flex: 0 0 auto;
+            flex: 0 0 auto;
+        }
+
+        .layout-split #calendar-card {
+            -webkit-flex: 1 1 auto;
+            flex: 1 1 auto;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-flex-direction: column;
+            flex-direction: column;
+        }
+
+        /* ==========================================================================
+           STANDBY RED NIGHT MODE (iOS 17 StandBy Night Vision Protection)
+           ========================================================================== */
+        body.night-red-active {
+            background-color: #000000 !important;
+        }
+
+        /* In Red Night Mode, hide bright photos unless temporarily woken, or tint deep crimson */
+        body.night-red-active:not(.night-temp-wake) #photo-stage {
+            opacity: 0.08;
+            -webkit-filter: grayscale(100%) sepia(100%) hue-rotate(315deg) saturate(400%) brightness(0.4);
+            filter: grayscale(100%) sepia(100%) hue-rotate(315deg) saturate(400%) brightness(0.4);
+        }
+
+        body.night-red-active:not(.night-temp-wake) .ambient-vignette {
+            opacity: 0;
+        }
+
+        body.night-red-active:not(.night-temp-wake) .apple-glass {
+            background-color: rgba(12, 0, 0, 0.78) !important;
+            border-color: rgba(255, 38, 38, 0.28) !important;
+            box-shadow: 0 0 40px rgba(255, 20, 20, 0.08) !important;
+        }
+
+        body.night-red-active:not(.night-temp-wake) * {
+            color: #ff2a2a !important;
+            border-color: rgba(255, 42, 42, 0.25) !important;
+        }
+
+        body.night-red-active:not(.night-temp-wake) .text-muted-apple {
+            color: rgba(255, 59, 48, 0.65) !important;
+        }
+
+        body.night-red-active:not(.night-temp-wake) svg {
+            stroke: #ff2a2a !important;
+        }
+
+        body.night-red-active:not(.night-temp-wake) .cal-today-badge {
+            background-color: #ff2a2a !important;
+            color: #000000 !important;
+        }
+
+        /* LCD Backlight Dimmer Overlay */
+        #lcd-dimmer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 40;
+            -webkit-transition: opacity 0.8s ease;
+            transition: opacity 0.8s ease;
+        }
+
+        /* Auto-Hiding Top Bar */
+        #top-controls {
+            position: fixed;
+            top: 26px;
+            right: 32px;
+            z-index: 50;
+            opacity: 1;
+            -webkit-transition: opacity 0.5s ease, -webkit-transform 0.5s ease;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        #top-controls.controls-hidden {
+            opacity: 0;
+            pointer-events: none;
+            -webkit-transform: translateY(-8px);
+            transform: translateY(-8px);
+        }
+
+        /* Photo Caption Pill (Top Left) */
+        #photo-info-pill {
+            position: fixed;
+            top: 26px;
+            left: 36px;
+            z-index: 30;
+            opacity: 1;
+            -webkit-transition: opacity 0.5s ease;
+            transition: opacity 0.5s ease;
+        }
+
+        #photo-info-pill.controls-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Clock Typography */
+        .standby-clock-digits {
+            font-size: 6.2rem;
+            line-height: 0.92;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            font-variant-numeric: tabular-nums;
+            color: #ffffff;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.85), 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
+        }
+
+        /* Floating Clock & Weather Container Styles (Transparent / No Box) */
+        .floating-widget-raw {
+            pointer-events: auto;
+            text-shadow: 0 3px 20px rgba(0, 0, 0, 0.8), 0 1px 6px rgba(0, 0, 0, 0.9);
+        }
+
+        /* Calendar Grid Cells */
+        .cal-grid {
+            display: -webkit-flex;
+            display: flex;
+            -webkit-flex-wrap: wrap;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .cal-cell {
+            width: 14.2857%;
+            text-align: center;
+            padding: 5px 0;
+            font-size: 0.82rem;
+            font-weight: 500;
+            position: relative;
+            cursor: pointer;
+            border-radius: 9999px;
+        }
+
+        .cal-today-badge {
+            background-color: #ff3b30;
+            color: #ffffff !important;
+            font-weight: 700;
+            border-radius: 9999px;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            display: inline-block;
+            margin: 0 auto;
+            box-shadow: 0 2px 8px rgba(255, 59, 48, 0.5);
+        }
+
+        .cal-selected-badge {
+            background-color: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 9999px;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            display: inline-block;
+            margin: 0 auto;
+        }
+
+        .cal-event-dot {
+            display: block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: #30d158;
+            margin: 2px auto 0 auto;
+        }
+
+        /* Custom Scrollbar for Agenda & Settings */
+        .apple-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .apple-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .apple-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+        }
+
+        /* iOS Toggle Switch */
+        .ios-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 30px;
+        }
+        .ios-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .ios-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(120, 120, 128, 0.36);
+            -webkit-transition: .3s;
+            transition: .3s;
+            border-radius: 34px;
+        }
+        .ios-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            -webkit-transition: .3s;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        input:checked + .ios-slider {
+            background-color: #30d158;
+        }
+        input:checked + .ios-slider:before {
+            -webkit-transform: translateX(20px);
+            transform: translateX(20px);
+        }
+
+        /* Responsive adjustments for smaller or portrait orientations */
+        @media (max-width: 900px) {
+            .standby-clock-digits {
+                font-size: 4.2rem;
+            }
+            .layout-fullscreen #widgets-stage {
+                padding: 20px;
+                -webkit-flex-direction: column;
+                flex-direction: column;
+                -webkit-justify-content: flex-end;
+                justify-content: flex-end;
+                -webkit-align-items: stretch;
+                align-items: stretch;
+            }
+            #clock-weather-card {
+                margin-bottom: 14px;
+            }
+        }
+    </style>
+</head>
+<body class="use-portrait-blur use-ken-burns">
+
+    <!-- LCD Backlight Dimmer Overlay (Controlled by Night Mode & Dimmer Slider) -->
+    <div id="lcd-dimmer-overlay"></div>
+
+    <!-- Wake Notification Toast (Appears briefly when tapping screen in Night Mode) -->
+    <div id="wake-toast" class="fixed top-7 left-1/2 -translate-x-1/2 z-50 apple-glass-pill px-4 py-2 rounded-full text-xs font-medium tracking-wide text-white/90 hidden pointer-events-none">
+        Screen Awake (15s) • Tap Moon to Exit Night Mode
+    </div>
+
+    <!-- Top-Left Source / Status Pill (Auto-hides with controls) -->
+    <div id="photo-info-pill" class="apple-glass-pill px-4 py-2 rounded-full flex items-center space-x-2.5 text-xs font-medium text-white/90">
+        <span id="source-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+        <span id="photo-source-label">Apple StandBy Curated</span>
+        <span class="text-white/40">•</span>
+        <span id="photo-counter-label" class="text-white/70">1 / 8</span>
+    </div>
+
+    <!-- Top-Right Floating Control Bar (Auto-hides after 6 seconds of inactivity) -->
+    <div id="top-controls" class="apple-glass-pill px-3 py-2 rounded-full flex items-center space-x-2">
+        <!-- Previous Photo -->
+        <button onclick="prevSlide(event)" title="Previous Photo" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+
+        <!-- Play / Pause Slideshow -->
+        <button onclick="togglePauseSlideshow(event)" id="btn-pause-slide" title="Pause/Resume Slideshow" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg id="icon-pause" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6"></path>
+            </svg>
+            <svg id="icon-play" class="w-5 h-5 text-white hidden" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+            </svg>
+        </button>
+
+        <!-- Next Photo -->
+        <button onclick="nextSlide(event)" title="Next Photo" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+
+        <div class="h-5 w-px bg-white/20 mx-1"></div>
+
+        <!-- Layout Quick Toggle (Full-Screen Bleed vs StandBy Split) -->
+        <button onclick="toggleLayoutMode(event)" title="Switch Layout (Full-Screen / Split StandBy)" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"></rect>
+                <line x1="14" y1="4" x2="14" y2="20" stroke-linecap="round" stroke-linejoin="round"></line>
+            </svg>
+        </button>
+
+        <!-- StandBy Night Mode Quick Toggle -->
+        <button onclick="toggleManualNightMode(event)" id="btn-night-mode" title="Toggle Nightstand Sleep / Red Mode" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+            </svg>
+        </button>
+
+        <!-- Settings Modal Button -->
+        <button onclick="openSettingsModal(event)" title="Dashboard & iCloud Photo Settings" class="p-2.5 rounded-full hover:bg-white/15 active:bg-white/25 transition">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- ==========================================================================
+         MAIN DASHBOARD CONTAINER (Full-Screen Bleed or Split-Screen)
+         ========================================================================== -->
+    <div id="app-container" class="layout-fullscreen" onclick="handleScreenTap(event)">
+
+        <!-- PHOTO SLIDESHOW STAGE -->
+        <div id="photo-stage">
+            <!-- Double-buffered slide layers for smooth cross-fade + portrait blur backdrop -->
+            <div id="slide-a" class="slide-layer active">
+                <div class="slide-backdrop" id="backdrop-a"></div>
+                <div class="slide-image" id="image-a"></div>
+            </div>
+            <div id="slide-b" class="slide-layer">
+                <div class="slide-backdrop" id="backdrop-b"></div>
+                <div class="slide-image" id="image-b"></div>
+            </div>
+
+            <!-- Subtle Apple Vignette Overlay -->
+            <div class="ambient-vignette"></div>
+        </div>
+
+        <!-- FLOATING WIDGETS STAGE -->
+        <div id="widgets-stage">
+
+            <!-- LEFT WIDGET: Minimalist Apple Clock, Date & Live Weather (Floating Raw Text, No Box) -->
+            <div id="clock-weather-card" class="widget-card floating-widget-raw p-2" style="width: 420px; max-width: 100%;" onclick="event.stopPropagation()">
+                <!-- Date Header -->
+                <div class="flex items-center justify-between mb-1">
+                    <div id="date-display" class="text-base font-extrabold uppercase tracking-widest text-red-400" style="text-shadow: 0 2px 12px rgba(0,0,0,0.9);">
+                        FRIDAY, OCT 30
+                    </div>
+                    <div id="ampm-badge" class="text-xs font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-black/50 border border-white/30 text-white shadow-lg">
+                        PM
+                    </div>
+                </div>
+
+                <!-- Large Apple StandBy Digital Time -->
+                <div class="flex items-baseline space-x-2 my-1">
+                    <div id="clock-display" class="standby-clock-digits">
+                        12:45
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="h-px w-full bg-white/30 my-3 shadow-sm"></div>
+
+                <!-- Live Weather Row (Defaults to Los Angeles, °F) -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3.5">
+                        <!-- Dynamic Weather SVG Icon -->
+                        <div id="weather-icon-container" class="w-12 h-12 rounded-2xl bg-black/40 border border-white/20 flex items-center justify-center text-amber-300 shadow-lg">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="5"></circle>
+                                <line x1="12" y1="1" x2="12" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="23"></line>
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                <line x1="1" y1="12" x2="3" y2="12"></line>
+                                <line x1="21" y1="12" x2="23" y2="12"></line>
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <span id="weather-city" class="text-lg font-bold text-white tracking-wide" style="text-shadow: 0 2px 10px rgba(0,0,0,0.9);">Los Angeles</span>
+                                <svg class="w-4 h-4 text-white/80" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div id="weather-desc" class="text-sm text-white/90 font-bold" style="text-shadow: 0 1px 8px rgba(0,0,0,0.9);">
+                                Mostly Clear
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-right">
+                        <div id="weather-temp" class="text-4xl font-black tracking-tight text-white" style="text-shadow: 0 2px 12px rgba(0,0,0,0.9);">
+                            74°
+                        </div>
+                        <div id="weather-hilo" class="text-xs font-bold text-white/80" style="text-shadow: 0 1px 8px rgba(0,0,0,0.9);">
+                            H:78°  L:59°
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT WIDGET: Clean Apple-Style Calendar (Interactive Month Grid + Up Next Agenda) -->
+            <div id="calendar-card" class="widget-card apple-glass rounded-3xl p-5 pointer-events-auto" style="width: 490px; max-width: 100%;" onclick="event.stopPropagation()">
+                <div class="flex flex-col sm:flex-row sm:space-x-5">
+                    
+                    <!-- Left Column: Compact Interactive Monthly Calendar Grid -->
+                    <div class="w-full sm:w-1/2 flex flex-col justify-between">
+                        <!-- Month Header & Navigation -->
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <span id="cal-month-title" class="text-sm font-bold tracking-wide text-red-400 uppercase">
+                                OCTOBER 2026
+                            </span>
+                            <div class="flex items-center space-x-1">
+                                <button onclick="changeCalendarMonth(-1)" class="p-1 rounded-full hover:bg-white/15 active:bg-white/25" title="Previous Month">
+                                    <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="resetCalendarToToday()" class="px-1.5 py-0.5 text-xs font-semibold rounded bg-white/10 hover:bg-white/20 text-white/90" title="Jump to Today">
+                                    Today
+                                </button>
+                                <button onclick="changeCalendarMonth(1)" class="p-1 rounded-full hover:bg-white/15 active:bg-white/25" title="Next Month">
+                                    <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Days of Week Header -->
+                        <div class="cal-grid text-white/50 text-muted-apple text-xs font-bold mb-1">
+                            <div class="cal-cell">S</div>
+                            <div class="cal-cell">M</div>
+                            <div class="cal-cell">T</div>
+                            <div class="cal-cell">W</div>
+                            <div class="cal-cell">T</div>
+                            <div class="cal-cell">F</div>
+                            <div class="cal-cell">S</div>
+                        </div>
+
+                        <!-- Days Grid -->
+                        <div id="cal-days-grid" class="cal-grid"></div>
+                    </div>
+
+                    <!-- Vertical Divider -->
+                    <div class="hidden sm:block w-px bg-white/15 my-1"></div>
+
+                    <!-- Right Column: Up Next / Daily Agenda List -->
+                    <div class="w-full sm:w-1/2 flex flex-col justify-between mt-4 sm:mt-0">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <span id="agenda-day-label" class="text-xs font-bold uppercase tracking-wider text-white/60 text-muted-apple block">
+                                        UP NEXT • TODAY
+                                    </span>
+                                </div>
+                                <button onclick="toggleQuickAddEvent()" class="p-1 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 text-white" title="Add Event or Reminder">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Quick Inline Add Event Input (Toggled via + button) -->
+                            <div id="quick-add-box" class="hidden mb-2.5 bg-black/40 p-2 rounded-xl border border-white/15">
+                                <input id="input-event-title" type="text" placeholder="Event title..." class="w-full bg-transparent text-xs text-white placeholder-white/40 focus:outline-none mb-1.5 border-b border-white/15 pb-1">
+                                <div class="flex items-center justify-between space-x-1">
+                                    <input id="input-event-time" type="text" placeholder="e.g. 9:30 AM" class="w-2/3 bg-white/10 rounded px-2 py-1 text-xs text-white placeholder-white/40 focus:outline-none">
+                                    <button onclick="saveQuickEvent()" class="px-2.5 py-1 rounded bg-emerald-500 text-black font-bold text-xs">
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Scrollable Events List -->
+                            <div id="agenda-list" class="space-y-2 max-h-44 overflow-y-auto apple-scroll pr-1">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Bottom Footer Hint -->
+                        <div class="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-xs text-white/50 text-muted-apple">
+                            <span id="cal-sync-status">iOS Calendar View</span>
+                            <button onclick="openSettingsModal(event, 'calendar')" class="hover:text-white underline">
+                                Sync .ics
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         SETTINGS MODAL (iCloud Shared Album, Nightstand Mode, Weather & Calendar)
+         ========================================================================== -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 hidden" onclick="closeSettingsModal(event)">
+        <div class="apple-modal-glass rounded-3xl w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden text-white border border-white/20" onclick="event.stopPropagation()">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-white/15 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold tracking-tight">StandBy Frame Settings</h2>
+                        <p class="text-xs text-white/60">Optimized for iPad 4 Retina (4:3) • Persistent Local Storage</p>
+                    </div>
+                </div>
+                <button onclick="closeSettingsModal()" class="px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/25 font-semibold text-sm">
+                    Done
+                </button>
+            </div>
+
+            <!-- Settings Navigation Tabs -->
+            <div class="px-6 pt-3 border-b border-white/10 flex space-x-2 overflow-x-auto">
+                <button onclick="switchSettingsTab('photos')" id="tab-btn-photos" class="px-4 py-2 text-sm font-semibold rounded-t-xl bg-white/15 text-white border-b-2 border-white">
+                    Photos & iCloud
+                </button>
+                <button onclick="switchSettingsTab('night')" id="tab-btn-night" class="px-4 py-2 text-sm font-semibold rounded-t-xl text-white/60 hover:text-white">
+                    Nightstand & Display
+                </button>
+                <button onclick="switchSettingsTab('weather')" id="tab-btn-weather" class="px-4 py-2 text-sm font-semibold rounded-t-xl text-white/60 hover:text-white">
+                    Weather & Clock
+                </button>
+                <button onclick="switchSettingsTab('calendar')" id="tab-btn-calendar" class="px-4 py-2 text-sm font-semibold rounded-t-xl text-white/60 hover:text-white">
+                    Calendar (.ics)
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-6 overflow-y-auto apple-scroll space-y-6 flex-1">
+
+                <!-- TAB 1: PHOTOS & iCLOUD SHARED ALBUM -->
+                <div id="tab-content-photos" class="space-y-5">
+                    
+                    <!-- Primary Option: iCloud Shared Album Public Link -->
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-bold text-sky-400 uppercase tracking-wider">1. iCloud Shared Album Public Link</span>
+                            <span id="icloud-status-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-white/80">Ready</span>
+                        </div>
+                        <p class="text-xs text-white/70 mb-3 leading-relaxed">
+                            In the Photos app on your iPhone/Mac, select a Shared Album, enable <strong>Public Website</strong>, and paste the `icloud.com/sharedalbum/#...` link below to automatically pull your photos.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input id="input-icloud-url" type="text" placeholder="https://www.icloud.com/sharedalbum/#B0z5qX..." class="flex-1 bg-black/50 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-sky-400">
+                            <button onclick="syncICloudSharedAlbum()" id="btn-sync-icloud" class="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-sm whitespace-nowrap">
+                                Sync Album
+                            </button>
+                        </div>
+                        <div id="icloud-feedback-msg" class="text-xs text-amber-300 mt-2 hidden"></div>
+                    </div>
+
+                    <!-- Slideshow Timing & Display Toggles -->
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Slideshow Speed</div>
+                                <div class="text-xs text-white/60">How often the background photo transitions</div>
+                            </div>
+                            <select id="select-slide-interval" onchange="updatePhotoSettings()" class="bg-black/60 border border-white/25 rounded-xl px-3 py-2 text-sm text-white">
+                                <option value="15000">Every 15 Seconds</option>
+                                <option value="30000">Every 30 Seconds</option>
+                                <option value="60000">Every 1 Minute</option>
+                                <option value="300000" selected>Every 5 Minutes (Default)</option>
+                                <option value="900000">Every 15 Minutes</option>
+                                <option value="1800000">Every 30 Minutes</option>
+                            </select>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Smart Blur Backdrop for Portrait Photos</div>
+                                <div class="text-xs text-white/60">Fills 4:3 horizontal iPad screen with matching blurred edges instead of cropping vertical photos</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-portrait-blur" checked onchange="updatePhotoSettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Subtle Ken Burns Pan & Zoom</div>
+                                <div class="text-xs text-white/60">Gentle hardware-accelerated motion during each slide</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-ken-burns" checked onchange="updatePhotoSettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Shuffle Photo Order</div>
+                                <div class="text-xs text-white/60">Randomize photo playback order</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-shuffle-photos" onchange="updatePhotoSettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Direct iPad Camera Roll / Shared Album Local Picker Fallback -->
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4">
+                        <div class="text-sm font-bold text-emerald-400 uppercase tracking-wider mb-1">2. Add Photos Directly from iPad Camera Roll</div>
+                        <p class="text-xs text-white/70 mb-3">
+                            Since iPad 4 syncs iCloud Shared Albums directly into the native iOS Photos app, you can also pick photos directly from your iPad to store offline in this dashboard:
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm cursor-pointer inline-block">
+                                Choose Photos from iPad...
+                                <input type="file" id="input-local-files" accept="image/*" multiple class="hidden" onchange="handleLocalPhotoUpload(event)">
+                            </label>
+                            <button onclick="resetToCuratedPhotos()" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold">
+                                Restore Default Apple Photos
+                            </button>
+                            <span id="local-upload-status" class="text-xs text-white/60"></span>
+                        </div>
+                    </div>
+
+                    <!-- Option 3: Custom Direct Photo URLs -->
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4">
+                        <div class="text-sm font-semibold mb-1">3. Or Paste Direct Image URLs (One per line)</div>
+                        <textarea id="textarea-custom-urls" rows="3" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg" class="w-full bg-black/50 border border-white/20 rounded-xl p-3 text-xs text-white placeholder-white/40 focus:outline-none mt-1"></textarea>
+                        <button onclick="saveCustomUrlList()" class="mt-2 px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-xs font-bold">
+                            Load Custom Image URLs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: NIGHTSTAND SLEEP & DISPLAY FEATURES -->
+                <div id="tab-content-night" class="space-y-5 hidden">
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Dashboard Layout Style</div>
+                                <div class="text-xs text-white/60">Full-Screen Photo Bleed with corner widgets or Split-Screen StandBy</div>
+                            </div>
+                            <select id="select-layout-mode" onchange="updateNightAndDisplaySettings()" class="bg-black/60 border border-white/25 rounded-xl px-3 py-2 text-sm text-white">
+                                <option value="fullscreen" selected>Full-Screen Photo Bleed</option>
+                                <option value="split">StandBy Split-Screen</option>
+                            </select>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold text-red-400">StandBy Red Night Mode</div>
+                                <div class="text-xs text-white/60">Transforms screen to pure black with deep ambient red tint at night to protect night vision</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-red-night-mode" checked onchange="updateNightAndDisplaySettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Auto Night Schedule (10:00 PM – 5:00 AM)</div>
+                                <div class="text-xs text-white/60">Automatically activates Night Mode & LCD Dimmer during sleep hours</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-auto-night-schedule" checked onchange="updateNightAndDisplaySettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="text-xs text-white/60 block mb-1">Night Starts Hour (24h)</label>
+                                <select id="select-night-start" onchange="updateNightAndDisplaySettings()" class="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-sm">
+                                    <option value="20">8:00 PM (20:00)</option>
+                                    <option value="21">9:00 PM (21:00)</option>
+                                    <option value="22" selected>10:00 PM (22:00)</option>
+                                    <option value="23">11:00 PM (23:00)</option>
+                                    <option value="0">12:00 AM (00:00)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-white/60 block mb-1">Morning Wake Hour (24h)</label>
+                                <select id="select-night-end" onchange="updateNightAndDisplaySettings()" class="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-sm">
+                                    <option value="5" selected>5:00 AM (05:00)</option>
+                                    <option value="6">6:00 AM (06:00)</option>
+                                    <option value="7">7:00 AM (07:00)</option>
+                                    <option value="8">8:00 AM (08:00)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-semibold">Night LCD Dimmer Overlay (85% Default)</span>
+                                <span id="label-dimmer-pct" class="text-xs font-bold text-amber-300">85% Dimmed</span>
+                            </div>
+                            <p class="text-xs text-white/60 mb-2">Reduces iPad 4 LCD glow in a dark bedroom. Tap anywhere on screen at night to wake for 15 seconds.</p>
+                            <input type="range" id="range-night-dimmer" min="0" max="95" step="5" value="85" onchange="updateNightAndDisplaySettings()" class="w-full">
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-500/10 border border-amber-400/30 rounded-2xl p-4 text-xs text-amber-200 leading-relaxed">
+                        <strong>iPad 4 Nightstand Pro-Tip:</strong> Tap Safari's <strong>Share</strong> button and choose <strong>Add to Home Screen</strong>. Launching from your Home Screen removes Safari's address bar for a true edge-to-edge Apple StandBy experience. Also set <em>Settings &gt; Display &amp; Brightness &gt; Auto-Lock &gt; Never</em> on your iPad.
+                    </div>
+                </div>
+
+                <!-- TAB 3: WEATHER & CLOCK -->
+                <div id="tab-content-weather" class="space-y-5 hidden">
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4 space-y-4">
+                        <div>
+                            <label class="text-sm font-semibold block mb-1">Weather Location (City Name)</label>
+                            <div class="flex gap-2">
+                                <input id="input-weather-city" type="text" value="Los Angeles" placeholder="e.g. Los Angeles, New York, London" class="flex-1 bg-black/50 border border-white/20 rounded-xl px-3.5 py-2 text-sm text-white">
+                                <button onclick="searchAndSaveWeatherCity()" class="px-4 py-2 rounded-xl bg-sky-500 text-black font-bold text-sm">
+                                    Update City
+                                </button>
+                            </div>
+                            <div id="weather-search-status" class="text-xs text-white/60 mt-1.5">Current: Los Angeles, CA (34.05°N, -118.24°W)</div>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">Temperature Unit</div>
+                                <div class="text-xs text-white/60">Fahrenheit (°F) or Celsius (°C)</div>
+                            </div>
+                            <select id="select-temp-unit" onchange="updateWeatherAndClockSettings()" class="bg-black/60 border border-white/25 rounded-xl px-3 py-2 text-sm text-white">
+                                <option value="fahrenheit" selected>Fahrenheit (°F)</option>
+                                <option value="celsius">Celsius (°C)</option>
+                            </select>
+                        </div>
+
+                        <div class="h-px bg-white/10"></div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold">24-Hour Time Format</div>
+                                <div class="text-xs text-white/60">Use 12-hour (AM/PM) or 24-hour clock</div>
+                            </div>
+                            <label class="ios-switch">
+                                <input type="checkbox" id="toggle-24h-clock" onchange="updateWeatherAndClockSettings()">
+                                <span class="ios-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: CALENDAR (.ICS SYNC & EVENTS) -->
+                <div id="tab-content-calendar" class="space-y-5 hidden">
+                    <div class="bg-white/5 border border-white/15 rounded-2xl p-4 space-y-3">
+                        <div class="text-sm font-bold text-red-400 uppercase tracking-wider">Live iCal / Apple / Google Calendar (.ics) Sync</div>
+                        <p class="text-xs text-white/70 leading-relaxed">
+                            Paste a public <strong>.ics</strong> calendar URL from Apple iCloud Calendar ( turn on <em>Public Calendar</em> and replace <code>webcal://</code> with <code>https://</code>) or Google Calendar's <em>Secret address in iCal format</em> to merge your live upcoming events into the nightstand agenda.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input id="input-ics-url" type="text" placeholder="https://pXX-caldav.icloud.com/published/2/..." class="flex-1 bg-black/50 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/40">
+                            <button onclick="syncICalFeed()" class="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold text-sm">
+                                Sync .ics
+                            </button>
+                        </div>
+                        <div id="ics-status-msg" class="text-xs text-white/60">You can also tap the "+" button directly on the calendar widget anytime to add or check off daily reminders.</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         JAVASCRIPT ENGINE (Written in clean ES5/ES6 for iOS 10.3.3 Safari WebKit)
+         ========================================================================== -->
+    <script>
+        /* --------------------------------------------------------------------------
+           1. CURATED HIGH-RES APPLE STANDBY DEFAULT PHOTOS
+           -------------------------------------------------------------------------- */
+        var DEFAULT_CURATED_PHOTOS = [
+            {
+                url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=2048&q=85",
+                title: "Yosemite Valley Dawn"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=2048&q=85",
+                title: "Misty Alpine Ridge"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2048&q=85",
+                title: "Pacific Coast Horizon"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=1400&q=85",
+                title: "Redwood Canopy (Portrait)"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=2048&q=85",
+                title: "Highland Sunbeams"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=2048&q=85",
+                title: "Lago di Braies Reflections"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1400&q=85",
+                title: "Sierra Pines (Portrait)"
+            },
+            {
+                url: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=2048&q=85",
+                title: "Golden Hour Meadow"
+            }
+        ];
+
+        /* --------------------------------------------------------------------------
+           2. APPLICATION STATE & PERSISTENT SETTINGS
+           -------------------------------------------------------------------------- */
+        var appState = {
+            photos: DEFAULT_CURATED_PHOTOS.slice(),
+            photoSourceLabel: "Apple StandBy Curated",
+            currentPhotoIndex: 0,
+            activeSlideLayer: "a", // 'a' or 'b'
+            isPaused: false,
+            slideTimer: null,
+            controlsHideTimer: null,
+            wakeTimer: null,
+
+            // User Configurable Settings (Saved in localStorage)
+            settings: {
+                icloudUrl: "",
+                slideIntervalMs: 300000, // 5 Minutes default per user preference
+                portraitBlur: true,
+                kenBurns: true,
+                shufflePhotos: false,
+                layoutMode: "fullscreen", // 'fullscreen' or 'split'
+                redNightMode: true,
+                autoNightSchedule: true,
+                nightStartHour: 22, // 10:00 PM
+                nightEndHour: 5,    // 5:00 AM
+                nightDimmerPct: 85,
+                manualNightOverride: null, // null = follow schedule, true = force night, false = force day
+                weatherCity: "Los Angeles",
+                weatherLat: 34.0522,
+                weatherLon: -118.2437,
+                tempUnit: "fahrenheit",
+                use24Hour: false,
+                icsUrl: ""
+            },
+
+            // Calendar State
+            calViewYear: new Date().getFullYear(),
+            calViewMonth: new Date().getMonth(),
+            selectedDateKey: formatDateKey(new Date()),
+            eventsByDate: {},
+            icsEventsByDate: {}
+        };
+
+        /* --------------------------------------------------------------------------
+           3. INITIALIZATION ON LOAD
+           -------------------------------------------------------------------------- */
+        window.onload = function () {
+            loadPersistedState();
+            applySettingsToDOM();
+            initDefaultSampleEvents();
+
+            // Start Live Clock & Night Schedule Checker
+            updateClockAndNightSchedule();
+            setInterval(updateClockAndNightSchedule, 1000);
+
+            // Start Slideshow
+            renderCurrentPhoto(true);
+            restartSlideTimer();
+
+            // Fetch Live Los Angeles Weather immediately & every 15 minutes
+            fetchLiveWeather();
+            setInterval(fetchLiveWeather, 900000);
+
+            // Render Interactive Apple Calendar & Agenda
+            renderCalendarWidget();
+
+            // If user had a saved iCloud link or .ics link, sync in background
+            if (appState.settings.icloudUrl) {
+                syncICloudSharedAlbum(true);
+            }
+            if (appState.settings.icsUrl) {
+                syncICalFeed(true);
+            }
+
+            // Start auto-hide timer for top controls
+            scheduleControlsAutoHide();
+        };
+
+        /* --------------------------------------------------------------------------
+           4. LOCALSTORAGE PERSISTENCE
+           -------------------------------------------------------------------------- */
+        function loadPersistedState() {
+            try {
+                var savedSettings = localStorage.getItem("standby_ipad_settings_v1");
+                if (savedSettings) {
+                    var parsed = JSON.parse(savedSettings);
+                    for (var key in parsed) {
+                        if (parsed.hasOwnProperty(key)) {
+                            appState.settings[key] = parsed[key];
+                        }
+                    }
+                }
+
+                var savedPhotos = localStorage.getItem("standby_ipad_custom_photos_v1");
+                var savedLabel = localStorage.getItem("standby_ipad_photo_label_v1");
+                if (savedPhotos) {
+                    var parsedPhotos = JSON.parse(savedPhotos);
+                    if (parsedPhotos && parsedPhotos.length > 0) {
+                        appState.photos = parsedPhotos;
+                        appState.photoSourceLabel = savedLabel || "Custom Album";
+                    }
+                }
+
+                var savedEvents = localStorage.getItem("standby_ipad_events_v1");
+                if (savedEvents) {
+                    appState.eventsByDate = JSON.parse(savedEvents) || {};
+                }
+            } catch (e) {
+                console.log("LocalStorage load fallback:", e);
+            }
+        }
+
+        function saveSettingsToStorage() {
+            try {
+                localStorage.setItem("standby_ipad_settings_v1", JSON.stringify(appState.settings));
+            } catch (e) {
+                console.log("Unable to save settings:", e);
+            }
+        }
+
+        function saveCustomPhotosToStorage(photosArray, sourceLabel) {
+            try {
+                localStorage.setItem("standby_ipad_custom_photos_v1", JSON.stringify(photosArray));
+                localStorage.setItem("standby_ipad_photo_label_v1", sourceLabel);
+            } catch (e) {
+                console.log("Storage quota exceeded for local photos; keeping in memory.");
+            }
+        }
+
+        function applySettingsToDOM() {
+            var s = appState.settings;
+
+            // Body classes for Portrait Blur & Ken Burns
+            document.body.classList.toggle("use-portrait-blur", !!s.portraitBlur);
+            document.body.classList.toggle("use-ken-burns", !!s.kenBurns);
+
+            // Layout Mode (Full-Screen Bleed vs Split-Screen)
+            var container = document.getElementById("app-container");
+            if (s.layoutMode === "split") {
+                container.className = "layout-split";
+            } else {
+                container.className = "layout-fullscreen";
+            }
+
+            // Sync Settings Modal Inputs
+            document.getElementById("input-icloud-url").value = s.icloudUrl || "";
+            document.getElementById("select-slide-interval").value = String(s.slideIntervalMs);
+            document.getElementById("toggle-portrait-blur").checked = !!s.portraitBlur;
+            document.getElementById("toggle-ken-burns").checked = !!s.kenBurns;
+            document.getElementById("toggle-shuffle-photos").checked = !!s.shufflePhotos;
+            document.getElementById("select-layout-mode").value = s.layoutMode;
+            document.getElementById("toggle-red-night-mode").checked = !!s.redNightMode;
+            document.getElementById("toggle-auto-night-schedule").checked = !!s.autoNightSchedule;
+            document.getElementById("select-night-start").value = String(s.nightStartHour);
+            document.getElementById("select-night-end").value = String(s.nightEndHour);
+            document.getElementById("range-night-dimmer").value = String(s.nightDimmerPct);
+            document.getElementById("label-dimmer-pct").textContent = s.nightDimmerPct + "% Dimmed";
+            document.getElementById("input-weather-city").value = s.weatherCity || "Los Angeles";
+            document.getElementById("select-temp-unit").value = s.tempUnit || "fahrenheit";
+            document.getElementById("toggle-24h-clock").checked = !!s.use24Hour;
+            document.getElementById("input-ics-url").value = s.icsUrl || "";
+        }
+
+        /* --------------------------------------------------------------------------
+           5. PHOTO SLIDESHOW ENGINE + PORTRAIT ASPECT RATIO DETECTOR
+           -------------------------------------------------------------------------- */
+        function renderCurrentPhoto(immediate) {
+            if (!appState.photos || appState.photos.length === 0) {
+                appState.photos = DEFAULT_CURATED_PHOTOS.slice();
+            }
+            if (appState.currentPhotoIndex >= appState.photos.length) {
+                appState.currentPhotoIndex = 0;
+            }
+            if (appState.currentPhotoIndex < 0) {
+                appState.currentPhotoIndex = appState.photos.length - 1;
+            }
+
+            var currentItem = appState.photos[appState.currentPhotoIndex];
+            var photoUrl = currentItem.url;
+
+            var nextLayerId = immediate ? appState.activeSlideLayer : (appState.activeSlideLayer === "a" ? "b" : "a");
+            var currentLayerId = appState.activeSlideLayer;
+
+            var nextSlideEl = document.getElementById("slide-" + nextLayerId);
+            var currentSlideEl = document.getElementById("slide-" + currentLayerId);
+            var nextBackdropEl = document.getElementById("backdrop-" + nextLayerId);
+            var nextImageEl = document.getElementById("image-" + nextLayerId);
+
+            // Preload image to check natural dimensions (Portrait vs Landscape)
+            var imgProbe = new Image();
+            imgProbe.onload = function () {
+                var isPortrait = imgProbe.naturalHeight > imgProbe.naturalWidth * 1.05;
+                if (isPortrait) {
+                    nextImageEl.classList.add("is-portrait");
+                } else {
+                    nextImageEl.classList.remove("is-portrait");
+                }
+
+                nextBackdropEl.style.backgroundImage = 'url("' + photoUrl + '")';
+                nextImageEl.style.backgroundImage = 'url("' + photoUrl + '")';
+
+                if (!immediate) {
+                    nextSlideEl.classList.add("active");
+                    currentSlideEl.classList.remove("active");
+                    appState.activeSlideLayer = nextLayerId;
+                }
+            };
+            imgProbe.onerror = function () {
+                // Fallback if image URL fails
+                nextBackdropEl.style.backgroundImage = 'url("' + photoUrl + '")';
+                nextImageEl.style.backgroundImage = 'url("' + photoUrl + '")';
+                if (!immediate) {
+                    nextSlideEl.classList.add("active");
+                    currentSlideEl.classList.remove("active");
+                    appState.activeSlideLayer = nextLayerId;
+                }
+            };
+            imgProbe.src = photoUrl;
+
+            // Update Top-Left Status Pill
+            document.getElementById("photo-source-label").textContent = appState.photoSourceLabel;
+            document.getElementById("photo-counter-label").textContent = (appState.currentPhotoIndex + 1) + " / " + appState.photos.length;
+        }
+
+        function restartSlideTimer() {
+            if (appState.slideTimer) {
+                clearInterval(appState.slideTimer);
+            }
+            if (!appState.isPaused) {
+                appState.slideTimer = setInterval(function () {
+                    advanceSlide(1);
+                }, Number(appState.settings.slideIntervalMs) || 300000);
+            }
+        }
+
+        function advanceSlide(direction) {
+            if (appState.settings.shufflePhotos && appState.photos.length > 2) {
+                var nextIdx = appState.currentPhotoIndex;
+                while (nextIdx === appState.currentPhotoIndex) {
+                    nextIdx = Math.floor(Math.random() * appState.photos.length);
+                }
+                appState.currentPhotoIndex = nextIdx;
+            } else {
+                appState.currentPhotoIndex += direction;
+            }
+            renderCurrentPhoto(false);
+        }
+
+        function nextSlide(e) {
+            if (e) e.stopPropagation();
+            advanceSlide(1);
+            restartSlideTimer();
+            scheduleControlsAutoHide();
+        }
+
+        function prevSlide(e) {
+            if (e) e.stopPropagation();
+            advanceSlide(-1);
+            restartSlideTimer();
+            scheduleControlsAutoHide();
+        }
+
+        function togglePauseSlideshow(e) {
+            if (e) e.stopPropagation();
+            appState.isPaused = !appState.isPaused;
+            document.getElementById("icon-pause").classList.toggle("hidden", appState.isPaused);
+            document.getElementById("icon-play").classList.toggle("hidden", !appState.isPaused);
+            restartSlideTimer();
+            scheduleControlsAutoHide();
+        }
+
+        function updatePhotoSettings() {
+            appState.settings.slideIntervalMs = Number(document.getElementById("select-slide-interval").value);
+            appState.settings.portraitBlur = document.getElementById("toggle-portrait-blur").checked;
+            appState.settings.kenBurns = document.getElementById("toggle-ken-burns").checked;
+            appState.settings.shufflePhotos = document.getElementById("toggle-shuffle-photos").checked;
+            saveSettingsToStorage();
+            applySettingsToDOM();
+            restartSlideTimer();
+        }
+
+        /* --------------------------------------------------------------------------
+           6. iCLOUD SHARED ALBUM PUBLIC LINK PARSER & FALLBACKS
+           -------------------------------------------------------------------------- */
+        function extractICloudToken(urlStr) {
+            if (!urlStr) return null;
+            var trimmed = urlStr.trim();
+            // Match #TOKEN after sharedalbum/
+            var hashIdx = trimmed.indexOf("#");
+            if (hashIdx !== -1) {
+                var tokenPart = trimmed.substring(hashIdx + 1).split(/[/?&]/)[0];
+                if (tokenPart && tokenPart.length >= 6) return tokenPart;
+            }
+            // Or if user pasted raw token directly
+            if (/^[A-Za-z0-9]+$/.test(trimmed) && trimmed.length >= 10) {
+                return trimmed;
+            }
+            return null;
+        }
+
+        function getICloudPartitionHost(token) {
+            // Apple partition calculation from base62 first char(s) of token
+            var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            var serverPartition = 1;
+            if (token && token.length > 0) {
+                var firstChar = token.charAt(0);
+                var idx = chars.indexOf(firstChar);
+                if (idx >= 0) {
+                    serverPartition = (idx % 20) + 1;
+                }
+            }
+            var padded = serverPartition < 10 ? "0" + serverPartition : String(serverPartition);
+            return "https://p" + padded + "-sharedstreams.icloud.com/" + token + "/sharedstreams";
+        }
+
+        function syncICloudSharedAlbum(silentMode) {
+            var inputEl = document.getElementById("input-icloud-url");
+            var feedbackEl = document.getElementById("icloud-feedback-msg");
+            var statusBadge = document.getElementById("icloud-status-badge");
+            var rawUrl = inputEl.value.trim();
+
+            var token = extractICloudToken(rawUrl);
+            if (!token) {
+                if (!silentMode) {
+                    feedbackEl.classList.remove("hidden");
+                    feedbackEl.textContent = "Please paste a valid iCloud Shared Album link (e.g. https://www.icloud.com/sharedalbum/#B0z...).";
+                }
+                return;
+            }
+
+            appState.settings.icloudUrl = rawUrl;
+            saveSettingsToStorage();
+
+            statusBadge.textContent = "Syncing...";
+            feedbackEl.classList.remove("hidden");
+            feedbackEl.textContent = "Connecting to Apple iCloud Shared Album stream (#" + token + ")...";
+
+            var baseEndpoint = getICloudPartitionHost(token);
+            var webstreamUrl = baseEndpoint + "/webstream";
+
+            // Attempt POST via CORS proxy so browser can read Apple's sharedstreams JSON
+            var proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(webstreamUrl);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", proxyUrl, true);
+            xhr.setRequestHeader("Content-Type", "text/plain");
+            xhr.timeout = 12000;
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+
+                if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+                    try {
+                        var streamData = JSON.parse(xhr.responseText);
+                        if (streamData && streamData.photos && streamData.photos.length > 0) {
+                            fetchICloudAssetUrls(baseEndpoint, streamData);
+                            return;
+                        }
+                    } catch (err) {
+                        console.log("iCloud stream parse error:", err);
+                    }
+                }
+
+                // Helpful explanation if Apple blocks CORS proxy or album isn't public
+                statusBadge.textContent = "See Info";
+                feedbackEl.textContent = "Note: Apple's iCloud server blocked direct browser CORS access for #" + token + ". Tip: Since your iPad 4 automatically syncs iCloud Shared Albums into the built-in iOS Photos app, tap 'Choose Photos from iPad' right below to load them directly with zero lag!";
+            };
+
+            try {
+                xhr.send(JSON.stringify({ streamCtag: null }));
+            } catch (e) {
+                statusBadge.textContent = "Local Fallback";
+            }
+        }
+
+        function fetchICloudAssetUrls(baseEndpoint, streamData) {
+            var photoGuids = [];
+            for (var i = 0; i < streamData.photos.length && i < 50; i++) {
+                if (streamData.photos[i].photoGuid) {
+                    photoGuids.push(streamData.photos[i].photoGuid);
+                }
+            }
+
+            var assetEndpoint = baseEndpoint + "/webasseturls";
+            var proxyAssetUrl = "https://corsproxy.io/?" + encodeURIComponent(assetEndpoint);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", proxyAssetUrl, true);
+            xhr.setRequestHeader("Content-Type", "text/plain");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+                    try {
+                        var assetData = JSON.parse(xhr.responseText);
+                        var items = assetData.items || {};
+                        var extractedPhotos = [];
+
+                        for (var key in items) {
+                            if (items.hasOwnProperty(key)) {
+                                var item = items[key];
+                                if (item.url_location && item.url_path) {
+                                    var fullUrl = "https://" + item.url_location + item.url_path;
+                                    extractedPhotos.push({
+                                        url: fullUrl,
+                                        title: streamData.streamName || "iCloud Shared Album"
+                                    });
+                                }
+                            }
+                        }
+
+                        if (extractedPhotos.length > 0) {
+                            appState.photos = extractedPhotos;
+                            appState.photoSourceLabel = streamData.streamName || "iCloud Shared Album";
+                            appState.currentPhotoIndex = 0;
+                            saveCustomPhotosToStorage(extractedPhotos, appState.photoSourceLabel);
+                            renderCurrentPhoto(false);
+
+                            document.getElementById("icloud-status-badge").textContent = "Synced (" + extractedPhotos.length + ")";
+                            document.getElementById("icloud-feedback-msg").textContent = "Successfully synced " + extractedPhotos.length + " photos from '" + appState.photoSourceLabel + "'!";
+                            return;
+                        }
+                    } catch (e) {
+                        console.log("Error parsing webasseturls:", e);
+                    }
+                }
+            };
+            xhr.send(JSON.stringify({ photoGuids: photoGuids }));
+        }
+
+        /* Local iPad Photo Picker (Reads files into resized Data URLs so they work offline) */
+        function handleLocalPhotoUpload(event) {
+            var files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            var statusEl = document.getElementById("local-upload-status");
+            statusEl.textContent = "Loading " + files.length + " photo(s)...";
+
+            var loadedPhotos = [];
+            var processed = 0;
+
+            for (var i = 0; i < files.length; i++) {
+                (function (file) {
+                    var reader = new FileReader();
+                    reader.onload = function (e) {
+                        loadedPhotos.push({
+                            url: e.target.result,
+                            title: file.name.replace(/\.[^/.]+$/, "")
+                        });
+                        processed++;
+                        if (processed === files.length) {
+                            appState.photos = loadedPhotos;
+                            appState.photoSourceLabel = "iPad Photos (" + loadedPhotos.length + ")";
+                            appState.currentPhotoIndex = 0;
+                            saveCustomPhotosToStorage(loadedPhotos, appState.photoSourceLabel);
+                            renderCurrentPhoto(false);
+                            statusEl.textContent = "Loaded " + loadedPhotos.length + " photos!";
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                })(files[i]);
+            }
+        }
+
+        function saveCustomUrlList() {
+            var rawText = document.getElementById("textarea-custom-urls").value;
+            var lines = rawText.split(/\r?\n/);
+            var customList = [];
+            for (var i = 0; i < lines.length; i++) {
+                var u = lines[i].trim();
+                if (u.indexOf("http") === 0) {
+                    customList.push({ url: u, title: "Custom Photo " + (customList.length + 1) });
+                }
+            }
+            if (customList.length > 0) {
+                appState.photos = customList;
+                appState.photoSourceLabel = "Custom Web Album";
+                appState.currentPhotoIndex = 0;
+                saveCustomPhotosToStorage(customList, appState.photoSourceLabel);
+                renderCurrentPhoto(false);
+            }
+        }
+
+        function resetToCuratedPhotos() {
+            localStorage.removeItem("standby_ipad_custom_photos_v1");
+            localStorage.removeItem("standby_ipad_photo_label_v1");
+            appState.photos = DEFAULT_CURATED_PHOTOS.slice();
+            appState.photoSourceLabel = "Apple StandBy Curated";
+            appState.currentPhotoIndex = 0;
+            renderCurrentPhoto(false);
+            document.getElementById("local-upload-status").textContent = "Restored default curated photos.";
+        }
+
+        /* --------------------------------------------------------------------------
+           7. CLOCK, AUTO NIGHTSTAND SCHEDULE, RED MODE & TAP-TO-WAKE
+           -------------------------------------------------------------------------- */
+        function updateClockAndNightSchedule() {
+            var now = new Date();
+            var hours24 = now.getHours();
+            var minutes = now.getMinutes();
+
+            // Format Time
+            var displayHours = hours24;
+            var ampm = hours24 >= 12 ? "PM" : "AM";
+            if (!appState.settings.use24Hour) {
+                displayHours = hours24 % 12;
+                if (displayHours === 0) displayHours = 12;
+                document.getElementById("ampm-badge").style.display = "inline-block";
+                document.getElementById("ampm-badge").textContent = ampm;
+            } else {
+                document.getElementById("ampm-badge").style.display = "none";
+            }
+
+            var minStr = minutes < 10 ? "0" + minutes : String(minutes);
+            document.getElementById("clock-display").textContent = displayHours + ":" + minStr;
+
+            // Format Date (e.g. FRIDAY, OCT 30)
+            var dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+            var monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            var dateStr = dayNames[now.getDay()] + ", " + monthNames[now.getMonth()] + " " + now.getDate();
+            document.getElementById("date-display").textContent = dateStr;
+
+            // Evaluate Night Mode Schedule
+            evaluateNightModeState(hours24);
+        }
+
+        function isWithinNightSchedule(currentHour) {
+            var start = Number(appState.settings.nightStartHour);
+            var end = Number(appState.settings.nightEndHour);
+            if (start > end) {
+                // Crosses midnight (e.g. 22:00 to 05:00)
+                return (currentHour >= start || currentHour < end);
+            } else {
+                return (currentHour >= start && currentHour < end);
+            }
+        }
+
+        function evaluateNightModeState(currentHour) {
+            var shouldBeNight = false;
+
+            if (appState.settings.manualNightOverride !== null) {
+                shouldBeNight = appState.settings.manualNightOverride;
+            } else if (appState.settings.autoNightSchedule) {
+                shouldBeNight = isWithinNightSchedule(currentHour);
+            }
+
+            var dimmerEl = document.getElementById("lcd-dimmer-overlay");
+            var isTemporarilyAwake = document.body.classList.contains("night-temp-wake");
+
+            if (shouldBeNight) {
+                // Apply Red Night Mode if enabled
+                document.body.classList.toggle("night-red-active", !!appState.settings.redNightMode);
+
+                // Apply LCD Backlight Dimmer unless user just tapped screen to wake for 15s
+                if (isTemporarilyAwake) {
+                    dimmerEl.style.opacity = "0";
+                } else {
+                    var dimOpacity = (Number(appState.settings.nightDimmerPct) || 85) / 100;
+                    dimmerEl.style.opacity = String(dimOpacity);
+                }
+            } else {
+                document.body.classList.remove("night-red-active");
+                dimmerEl.style.opacity = "0";
+            }
+        }
+
+        function toggleManualNightMode(e) {
+            if (e) e.stopPropagation();
+            var currentlyNight = document.body.classList.contains("night-red-active") ||
+                                 parseFloat(document.getElementById("lcd-dimmer-overlay").style.opacity || "0") > 0.1;
+
+            appState.settings.manualNightOverride = !currentlyNight;
+            document.body.classList.remove("night-temp-wake");
+            updateClockAndNightSchedule();
+            scheduleControlsAutoHide();
+        }
+
+        function toggleLayoutMode(e) {
+            if (e) e.stopPropagation();
+            appState.settings.layoutMode = (appState.settings.layoutMode === "fullscreen") ? "split" : "fullscreen";
+            saveSettingsToStorage();
+            applySettingsToDOM();
+            scheduleControlsAutoHide();
+        }
+
+        function updateNightAndDisplaySettings() {
+            appState.settings.layoutMode = document.getElementById("select-layout-mode").value;
+            appState.settings.redNightMode = document.getElementById("toggle-red-night-mode").checked;
+            appState.settings.autoNightSchedule = document.getElementById("toggle-auto-night-schedule").checked;
+            appState.settings.nightStartHour = Number(document.getElementById("select-night-start").value);
+            appState.settings.nightEndHour = Number(document.getElementById("select-night-end").value);
+            appState.settings.nightDimmerPct = Number(document.getElementById("range-night-dimmer").value);
+            appState.settings.manualNightOverride = null; // Reset manual override when changing schedule
+
+            document.getElementById("label-dimmer-pct").textContent = appState.settings.nightDimmerPct + "% Dimmed";
+            saveSettingsToStorage();
+            applySettingsToDOM();
+            updateClockAndNightSchedule();
+        }
+
+        /* Tap Anywhere on Screen: Shows Top Controls + Temporarily Wakes Dimmed Night Screen for 15s */
+        function handleScreenTap(e) {
+            showControlsAndScheduleHide();
+
+            var dimmerEl = document.getElementById("lcd-dimmer-overlay");
+            var isNightActive = document.body.classList.contains("night-red-active") ||
+                                parseFloat(dimmerEl.style.opacity || "0") > 0.1;
+
+            if (isNightActive) {
+                document.body.classList.add("night-temp-wake");
+                var toast = document.getElementById("wake-toast");
+                toast.classList.remove("hidden");
+                updateClockAndNightSchedule();
+
+                if (appState.wakeTimer) clearTimeout(appState.wakeTimer);
+                appState.wakeTimer = setTimeout(function () {
+                    document.body.classList.remove("night-temp-wake");
+                    toast.classList.add("hidden");
+                    updateClockAndNightSchedule();
+                }, 15000);
+            }
+        }
+
+        function showControlsAndScheduleHide() {
+            document.getElementById("top-controls").classList.remove("controls-hidden");
+            document.getElementById("photo-info-pill").classList.remove("controls-hidden");
+            scheduleControlsAutoHide();
+        }
+
+        function scheduleControlsAutoHide() {
+            if (appState.controlsHideTimer) clearTimeout(appState.controlsHideTimer);
+            appState.controlsHideTimer = setTimeout(function () {
+                document.getElementById("top-controls").classList.add("controls-hidden");
+                document.getElementById("photo-info-pill").classList.add("controls-hidden");
+            }, 6000);
+        }
+
+        /* --------------------------------------------------------------------------
+           8. LIVE WEATHER ENGINE (Open-Meteo API, Defaults to Los Angeles °F)
+           -------------------------------------------------------------------------- */
+        function fetchLiveWeather() {
+            var lat = appState.settings.weatherLat || 34.0522;
+            var lon = appState.settings.weatherLon || -118.2437;
+            var unit = appState.settings.tempUnit || "fahrenheit";
+
+            var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
+                      "&longitude=" + lon +
+                      "&current_weather=true&daily=temperature_2m_max,temperature_2m_min&temperature_unit=" + unit +
+                      "&timezone=auto";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        if (data && data.current_weather) {
+                            var temp = Math.round(data.current_weather.temperature);
+                            var code = data.current_weather.weathercode;
+                            var hi = temp + 4;
+                            var lo = temp - 12;
+
+                            if (data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max.length > 0) {
+                                hi = Math.round(data.daily.temperature_2m_max[0]);
+                                lo = Math.round(data.daily.temperature_2m_min[0]);
+                            }
+
+                            document.getElementById("weather-city").textContent = appState.settings.weatherCity;
+                            document.getElementById("weather-temp").textContent = temp + "°";
+                            document.getElementById("weather-hilo").textContent = "H:" + hi + "°  L:" + lo + "°";
+                            document.getElementById("weather-desc").textContent = getWeatherConditionLabel(code);
+                            document.getElementById("weather-icon-container").innerHTML = getWeatherIconSvg(code);
+                        }
+                    } catch (e) {
+                        console.log("Weather parse error:", e);
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function searchAndSaveWeatherCity() {
+            var cityInput = document.getElementById("input-weather-city").value.trim();
+            var statusEl = document.getElementById("weather-search-status");
+            if (!cityInput) return;
+
+            statusEl.textContent = "Searching coordinates for '" + cityInput + "'...";
+            var geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(cityInput) + "&count=1&language=en&format=json";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", geoUrl, true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res && res.results && res.results.length > 0) {
+                            var place = res.results[0];
+                            appState.settings.weatherCity = place.name;
+                            appState.settings.weatherLat = place.latitude;
+                            appState.settings.weatherLon = place.longitude;
+                            saveSettingsToStorage();
+                            fetchLiveWeather();
+                            statusEl.textContent = "Updated to " + place.name + (place.admin1 ? ", " + place.admin1 : "");
+                        } else {
+                            statusEl.textContent = "City not found. Try another name.";
+                        }
+                    } catch (e) {
+                        statusEl.textContent = "Error looking up city.";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function updateWeatherAndClockSettings() {
+            appState.settings.tempUnit = document.getElementById("select-temp-unit").value;
+            appState.settings.use24Hour = document.getElementById("toggle-24h-clock").checked;
+            saveSettingsToStorage();
+            updateClockAndNightSchedule();
+            fetchLiveWeather();
+        }
+
+        function getWeatherConditionLabel(code) {
+            if (code === 0) return "Clear Sky";
+            if (code === 1 || code === 2) return "Mostly Clear";
+            if (code === 3) return "Overcast";
+            if (code >= 45 && code <= 48) return "Foggy";
+            if (code >= 51 && code <= 67) return "Light Rain";
+            if (code >= 71 && code <= 77) return "Snow";
+            if (code >= 80 && code <= 82) return "Rain Showers";
+            if (code >= 95) return "Thunderstorm";
+            return "Partly Cloudy";
+        }
+
+        function getWeatherIconSvg(code) {
+            if (code === 0 || code === 1) {
+                return '<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+            }
+            if (code >= 51 && code <= 82) {
+                return '<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="12" y1="19" x2="12" y2="21"></line><line x1="16" y1="19" x2="16" y2="21"></line></svg>';
+            }
+            return '<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>';
+        }
+
+        /* --------------------------------------------------------------------------
+           9. APPLE-STYLE CALENDAR WIDGET (MONTHLY GRID + UP NEXT AGENDA + .ICS)
+           -------------------------------------------------------------------------- */
+        function formatDateKey(dateObj) {
+            var y = dateObj.getFullYear();
+            var m = dateObj.getMonth() + 1;
+            var d = dateObj.getDate();
+            return y + "-" + (m < 10 ? "0" + m : m) + "-" + (d < 10 ? "0" + d : d);
+        }
+
+        function initDefaultSampleEvents() {
+            var todayKey = formatDateKey(new Date());
+            if (!appState.eventsByDate[todayKey] || appState.eventsByDate[todayKey].length === 0) {
+                var tmrw = new Date();
+                tmrw.setDate(tmrw.getDate() + 1);
+                var tmrwKey = formatDateKey(tmrw);
+
+                appState.eventsByDate[todayKey] = [
+                    { id: "e1", title: "Morning Coffee & Briefing", time: "8:30 AM", done: false },
+                    { id: "e2", title: "Sunset Walk", time: "5:45 PM", done: false },
+                    { id: "e3", title: "Nightstand Sleep Mode", time: "10:00 PM", done: false }
+                ];
+                if (!appState.eventsByDate[tmrwKey]) {
+                    appState.eventsByDate[tmrwKey] = [
+                        { id: "e4", title: "Weekend Farmers Market", time: "10:00 AM", done: false }
+                    ];
+                }
+            }
+        }
+
+        function getCombinedEventsForDateKey(dateKey) {
+            var localList = appState.eventsByDate[dateKey] || [];
+            var icsList = appState.icsEventsByDate[dateKey] || [];
+            return icsList.concat(localList);
+        }
+
+        function renderCalendarWidget() {
+            var year = appState.calViewYear;
+            var month = appState.calViewMonth;
+
+            var monthNamesFull = [
+                "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+                "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+            ];
+            document.getElementById("cal-month-title").textContent = monthNamesFull[month] + " " + year;
+
+            var firstDayOfWeek = new Date(year, month, 1).getDay();
+            var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            var todayKey = formatDateKey(new Date());
+            var gridEl = document.getElementById("cal-days-grid");
+            gridEl.innerHTML = "";
+
+            // Blank leading cells
+            for (var b = 0; b < firstDayOfWeek; b++) {
+                var emptyCell = document.createElement("div");
+                emptyCell.className = "cal-cell";
+                gridEl.appendChild(emptyCell);
+            }
+
+            // Day cells
+            for (var day = 1; day <= daysInMonth; day++) {
+                (function (dNum) {
+                    var cellDate = new Date(year, month, dNum);
+                    var key = formatDateKey(cellDate);
+                    var isToday = (key === todayKey);
+                    var isSelected = (key === appState.selectedDateKey);
+                    var hasEvents = getCombinedEventsForDateKey(key).length > 0;
+
+                    var cell = document.createElement("div");
+                    cell.className = "cal-cell text-white/90 hover:bg-white/10";
+                    cell.onclick = function () {
+                        appState.selectedDateKey = key;
+                        renderCalendarWidget();
+                    };
+
+                    var badgeSpan = document.createElement("span");
+                    badgeSpan.textContent = dNum;
+                    if (isToday) {
+                        badgeSpan.className = "cal-today-badge";
+                    } else if (isSelected) {
+                        badgeSpan.className = "cal-selected-badge";
+                    }
+                    cell.appendChild(badgeSpan);
+
+                    if (hasEvents) {
+                        var dot = document.createElement("span");
+                        dot.className = "cal-event-dot";
+                        cell.appendChild(dot);
+                    }
+
+                    gridEl.appendChild(cell);
+                })(day);
+            }
+
+            renderAgendaList();
+        }
+
+        function renderAgendaList() {
+            var todayKey = formatDateKey(new Date());
+            var activeKey = appState.selectedDateKey;
+            var labelEl = document.getElementById("agenda-day-label");
+
+            if (activeKey === todayKey) {
+                labelEl.textContent = "UP NEXT • TODAY";
+            } else {
+                labelEl.textContent = "AGENDA • " + activeKey;
+            }
+
+            var events = getCombinedEventsForDateKey(activeKey);
+            var listEl = document.getElementById("agenda-list");
+            listEl.innerHTML = "";
+
+            if (events.length === 0) {
+                listEl.innerHTML = '<div class="text-xs text-white/50 text-muted-apple py-4 text-center">No scheduled events for this day.<br>Tap <strong>+</strong> to add a reminder.</div>';
+                return;
+            }
+
+            for (var i = 0; i < events.length; i++) {
+                (function (ev, idx) {
+                    var item = document.createElement("div");
+                    item.className = "flex items-center justify-between p-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/15 cursor-pointer transition";
+                    item.onclick = function () {
+                        if (!ev.fromIcs) {
+                            ev.done = !ev.done;
+                            localStorage.setItem("standby_ipad_events_v1", JSON.stringify(appState.eventsByDate));
+                            renderAgendaList();
+                        }
+                    };
+
+                    var leftWrap = document.createElement("div");
+                    leftWrap.className = "flex items-center space-x-2.5 overflow-hidden";
+
+                    var colorBar = document.createElement("span");
+                    colorBar.className = "w-1 h-7 rounded-full flex-shrink-0 " + (ev.fromIcs ? "bg-sky-400" : (ev.done ? "bg-white/30" : "bg-emerald-400"));
+                    leftWrap.appendChild(colorBar);
+
+                    var textWrap = document.createElement("div");
+                    textWrap.className = "truncate";
+                    var titleDiv = document.createElement("div");
+                    titleDiv.className = "text-xs font-semibold truncate " + (ev.done ? "line-through text-white/40" : "text-white");
+                    titleDiv.textContent = ev.title;
+
+                    var timeDiv = document.createElement("div");
+                    timeDiv.className = "text-xs text-white/60 text-muted-apple";
+                    timeDiv.textContent = ev.time || "All Day";
+
+                    textWrap.appendChild(titleDiv);
+                    textWrap.appendChild(timeDiv);
+                    leftWrap.appendChild(textWrap);
+
+                    item.appendChild(leftWrap);
+
+                    if (!ev.fromIcs) {
+                        var delBtn = document.createElement("button");
+                        delBtn.className = "text-white/40 hover:text-red-400 px-1.5 text-xs font-bold";
+                        delBtn.innerHTML = "&times;";
+                        delBtn.title = "Remove Event";
+                        delBtn.onclick = function (e) {
+                            e.stopPropagation();
+                            deleteLocalEvent(activeKey, ev.id);
+                        };
+                        item.appendChild(delBtn);
+                    }
+
+                    listEl.appendChild(item);
+                })(events[i], i);
+            }
+        }
+
+        function changeCalendarMonth(delta) {
+            appState.calViewMonth += delta;
+            if (appState.calViewMonth > 11) {
+                appState.calViewMonth = 0;
+                appState.calViewYear++;
+            } else if (appState.calViewMonth < 0) {
+                appState.calViewMonth = 11;
+                appState.calViewYear--;
+            }
+            renderCalendarWidget();
+        }
+
+        function resetCalendarToToday() {
+            var now = new Date();
+            appState.calViewYear = now.getFullYear();
+            appState.calViewMonth = now.getMonth();
+            appState.selectedDateKey = formatDateKey(now);
+            renderCalendarWidget();
+        }
+
+        function toggleQuickAddEvent() {
+            var box = document.getElementById("quick-add-box");
+            box.classList.toggle("hidden");
+            if (!box.classList.contains("hidden")) {
+                document.getElementById("input-event-title").focus();
+            }
+        }
+
+        function saveQuickEvent() {
+            var titleEl = document.getElementById("input-event-title");
+            var timeEl = document.getElementById("input-event-time");
+            var title = titleEl.value.trim();
+            var time = timeEl.value.trim() || "All Day";
+
+            if (!title) return;
+
+            var key = appState.selectedDateKey;
+            if (!appState.eventsByDate[key]) {
+                appState.eventsByDate[key] = [];
+            }
+            appState.eventsByDate[key].push({
+                id: "ev_" + new Date().getTime(),
+                title: title,
+                time: time,
+                done: false
+            });
+
+            localStorage.setItem("standby_ipad_events_v1", JSON.stringify(appState.eventsByDate));
+            titleEl.value = "";
+            timeEl.value = "";
+            document.getElementById("quick-add-box").classList.add("hidden");
+            renderCalendarWidget();
+        }
+
+        function deleteLocalEvent(dateKey, eventId) {
+            var list = appState.eventsByDate[dateKey];
+            if (!list) return;
+            var filtered = [];
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id !== eventId) filtered.push(list[i]);
+            }
+            appState.eventsByDate[dateKey] = filtered;
+            localStorage.setItem("standby_ipad_events_v1", JSON.stringify(appState.eventsByDate));
+            renderCalendarWidget();
+        }
+
+        /* Live iCal (.ics) Feed Parser */
+        function syncICalFeed(silentMode) {
+            var rawIcsUrl = document.getElementById("input-ics-url").value.trim();
+            var statusMsg = document.getElementById("ics-status-msg");
+            if (!rawIcsUrl) return;
+
+            var normalizedUrl = rawIcsUrl.replace(/^webcal:\/\//i, "https://");
+            appState.settings.icsUrl = normalizedUrl;
+            saveSettingsToStorage();
+
+            if (!silentMode) {
+                statusMsg.textContent = "Fetching & parsing .ics calendar feed...";
+            }
+
+            var proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(normalizedUrl);
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", proxyUrl, true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+                    var count = parseICalText(xhr.responseText);
+                    statusMsg.textContent = "Synced " + count + " calendar events from .ics feed!";
+                    document.getElementById("cal-sync-status").textContent = "iCal Live Synced";
+                    renderCalendarWidget();
+                } else if (!silentMode) {
+                    statusMsg.textContent = "Could not load .ics link. Make sure the calendar is public.";
+                }
+            };
+            xhr.send();
+        }
+
+        function parseICalText(icsText) {
+            var blocks = icsText.split("BEGIN:VEVENT");
+            var parsedMap = {};
+            var count = 0;
+
+            for (var i = 1; i < blocks.length; i++) {
+                var block = blocks[i];
+                var summaryMatch = block.match(/SUMMARY[^:]*:([^\r\n]+)/);
+                var dtStartMatch = block.match(/DTSTART[^:]*:(\d{8})(?:T(\d{4}))?/);
+
+                if (summaryMatch && dtStartMatch) {
+                    var summary = summaryMatch[1].trim();
+                    var ymd = dtStartMatch[1];
+                    var hm = dtStartMatch[2];
+
+                    var dateKey = ymd.substring(0, 4) + "-" + ymd.substring(4, 6) + "-" + ymd.substring(6, 8);
+                    var timeFormatted = "All Day";
+                    if (hm) {
+                        var h = parseInt(hm.substring(0, 2), 10);
+                        var m = hm.substring(2, 4);
+                        var ampm = h >= 12 ? "PM" : "AM";
+                        var h12 = h % 12 || 12;
+                        timeFormatted = h12 + ":" + m + " " + ampm;
+                    }
+
+                    if (!parsedMap[dateKey]) parsedMap[dateKey] = [];
+                    parsedMap[dateKey].push({
+                        id: "ics_" + i,
+                        title: summary,
+                        time: timeFormatted,
+                        fromIcs: true
+                    });
+                    count++;
+                }
+            }
+
+            appState.icsEventsByDate = parsedMap;
+            return count;
+        }
+
+        /* --------------------------------------------------------------------------
+           10. SETTINGS MODAL CONTROLS
+           -------------------------------------------------------------------------- */
+        function openSettingsModal(e, tabName) {
+            if (e) e.stopPropagation();
+            document.getElementById("settings-modal").classList.remove("hidden");
+            if (tabName) {
+                switchSettingsTab(tabName);
+            }
+        }
+
+        function closeSettingsModal(e) {
+            if (e) e.stopPropagation();
+            document.getElementById("settings-modal").classList.add("hidden");
+            scheduleControlsAutoHide();
+        }
+
+        function switchSettingsTab(tabName) {
+            var tabs = ["photos", "night", "weather", "calendar"];
+            for (var i = 0; i < tabs.length; i++) {
+                var t = tabs[i];
+                var contentEl = document.getElementById("tab-content-" + t);
+                var btnEl = document.getElementById("tab-btn-" + t);
+
+                if (t === tabName) {
+                    contentEl.classList.remove("hidden");
+                    btnEl.className = "px-4 py-2 text-sm font-semibold rounded-t-xl bg-white/15 text-white border-b-2 border-white";
+                } else {
+                    contentEl.classList.add("hidden");
+                    btnEl.className = "px-4 py-2 text-sm font-semibold rounded-t-xl text-white/60 hover:text-white";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
